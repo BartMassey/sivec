@@ -1,7 +1,7 @@
 #![feature(alloc, core_intrinsics)]
 extern crate alloc;
 use alloc::raw_vec::RawVec;
-use std::ops::Index;
+use std::ops::{Index, IndexMut};
 use std::cell::RefCell;
 
 enum Initializer<'a, T: 'a + Clone> {
@@ -42,7 +42,8 @@ impl <'a, T: Clone> SIVec<'a, T> {
         }
     }
 
-    pub fn new_with_constructor(constructor: &'a Fn(usize) -> T) -> SIVec<'a, T> {
+    pub fn new_with_constructor(constructor: &'a Fn(usize) -> T)
+                                -> SIVec<'a, T> {
         SIVec {
             value_stack: RefCell::new(Vec::new()),
             vec: RawVec::new(),
@@ -50,7 +51,7 @@ impl <'a, T: Clone> SIVec<'a, T> {
         }
     }
 
-    pub fn get_mut_ref(&'a self, index: usize, value: Option<T>)
+    fn get_mut_ref(&'a self, index: usize, value: Option<T>)
                        -> &'a mut T {
         if index >= self.vec.cap() {
             panic!("SIVec: index bounds");
@@ -72,7 +73,7 @@ impl <'a, T: Clone> SIVec<'a, T> {
             // this datatype.
             return unsafe{result.as_mut::<'a>()}.unwrap()
         }
-        let _init = match value {
+        let init = match value {
             Some(v) => v,
             None => match self.initializer {
                 Initializer::None => panic!("SIVec: unable to initialize"),
@@ -80,7 +81,22 @@ impl <'a, T: Clone> SIVec<'a, T> {
                 Initializer::Closure(ref f) => (*f)(index).clone()
             }
         };
-        unimplemented!()
+        let new_value = Value {
+            value: init,
+            index: index
+        };
+        value_stack.push(new_value);
+        let result: *mut T = &mut value_stack[vsl].value;
+        // XXX See above.
+        return unsafe{result.as_mut::<'a>()}.unwrap()
+    }
+
+    pub fn set(&self, index: usize, value: T) {
+        let _ = self.get_mut_ref(index, Some(value));
+    }
+
+    pub fn get(&self, index: usize) -> &T {
+        self.get_mut_ref(index, None)
     }
 }
 
@@ -88,6 +104,12 @@ impl <'a, T: Clone> Index<usize> for SIVec<'a, T> {
     type Output = T;
 
     fn index<'b>(&'b self, index: usize) -> &'b T {
+        self.get_mut_ref(index, None)
+    }
+}
+
+impl <'a, T: Clone> IndexMut<usize> for SIVec<'a, T> {
+    fn index_mut(&mut self, index: usize) -> &mut T {
         self.get_mut_ref(index, None)
     }
 }
