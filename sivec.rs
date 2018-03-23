@@ -118,3 +118,21 @@ impl <'a, T: Clone> IndexMut<usize> for SIVec<'a, T> {
         self.get_mut_ref(index, None)
     }
 }
+
+#[test]
+fn basic_test() {
+    let v = SIVec::new(10);
+    v.set(3, 'a');
+    assert_eq!(v[3], 'a');
+
+    let mut v = SIVec::with_default(10, 'b');
+    v[3] = 'a';
+    assert_eq!(v[3], 'a');
+    assert_eq!(v[4], 'b');
+    v[4] = 'c';
+    assert_eq!(v[3], 'a');
+    assert_eq!(v[4], 'c');
+    v[3] = 'b';
+    assert_eq!(v[3], 'b');
+    assert_eq!(v[4], 'c');
+}
