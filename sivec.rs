@@ -1,6 +1,7 @@
-#![feature(alloc, core_intrinsics)]
+#![feature(alloc, allocator_api, core_intrinsics)]
 extern crate alloc;
 use alloc::raw_vec::RawVec;
+use alloc::heap::Heap;
 use std::ops::{Index, IndexMut};
 use std::cell::RefCell;
 
@@ -21,32 +22,33 @@ struct Value<T> {
 
 pub struct SIVec<'a, T: 'a + Clone> {
     value_stack: RefCell<Vec<Value<T>>>,
-    vec: RawVec<usize>,
+    vec: RawVec<usize, Heap>,
     initializer: Initializer<'a, T>
 }
     
 impl <'a, T: Clone> SIVec<'a, T> {
-    pub fn new() -> SIVec<'a, T> {
+    pub fn new(capacity: usize) -> SIVec<'a, T> {
         SIVec {
             value_stack: RefCell::new(Vec::new()),
-            vec: RawVec::new(),
+            vec: RawVec::with_capacity(capacity),
             initializer: Initializer::None
         }
     }
 
-    pub fn new_with_default(default: T) -> SIVec<'a, T> {
+    pub fn with_default(capacity: usize, default: T)
+                        -> SIVec<'a, T> {
         SIVec {
             value_stack: RefCell::new(Vec::new()),
-            vec: RawVec::new(),
+            vec: RawVec::with_capacity(capacity),
             initializer: Initializer::Const(default)
         }
     }
 
-    pub fn new_with_constructor(constructor: &'a Fn(usize) -> T)
-                                -> SIVec<'a, T> {
+    pub fn with_constructor(capacity: usize, constructor: &'a Fn(usize) -> T)
+                            -> SIVec<'a, T> {
         SIVec {
             value_stack: RefCell::new(Vec::new()),
-            vec: RawVec::new(),
+            vec: RawVec::with_capacity(capacity),
             initializer: Initializer::Closure(constructor)
         }
     }
@@ -57,9 +59,10 @@ impl <'a, T: Clone> SIVec<'a, T> {
             panic!("SIVec: index bounds");
         }
         let store = self.vec.ptr();
+        let ip = unsafe{store.offset(index as isize)};
         // XXX Need to do an unsafe read because
         // all we have is a raw pointer.
-        let si = unsafe{*store.offset(index as isize)};
+        let si = unsafe{*ip};
         let mut value_stack = self.value_stack.borrow_mut();
         let vsl = value_stack.len();
         if si < vsl && value_stack[si].index == index {
@@ -86,8 +89,10 @@ impl <'a, T: Clone> SIVec<'a, T> {
             index: index
         };
         value_stack.push(new_value);
+        // XXX Initialize the index.
+        unsafe{*ip = vsl};
         let result: *mut T = &mut value_stack[vsl].value;
-        // XXX See above.
+        // XXX See existing case above.
         return unsafe{result.as_mut::<'a>()}.unwrap()
     }
 
