@@ -36,6 +36,21 @@ impl <T> SIVec<T> {
 
     pub fn get_mut_ref<'a>(&'a self, index: usize, value: Option<T>)
                            -> &'a mut T {
+        if index >= self.vec.cap() {
+            panic!("SIVec: index bounds");
+        }
+        let store = self.vec.ptr();
+        // XXX Need to do an unsafe read because
+        // all we have is a raw pointer.
+        let si = unsafe{*store.offset(index as isize)};
+        let mut value_stack = self.value_stack.borrow_mut();
+        if si < value_stack.len() && value_stack[si].index == index {
+            let result: *mut T = &mut value_stack[si].value;
+            // XXX The value is guaranteed to live as long
+            // as the borrow of self, by construction of
+            // this datatype.
+            return unsafe{result.as_mut::<'a>()}.unwrap()
+        }
         unimplemented!()
     }
 }
@@ -44,21 +59,6 @@ impl <T: Clone> Index<usize> for SIVec<T> {
     type Output = T;
 
     fn index<'a>(&'a self, index: usize) -> &'a T {
-        if index >= self.vec.cap() {
-            panic!("SIVec: index bounds");
-        }
-        let store = self.vec.ptr();
-        // XXX Need to do an unsafe read because
-        // all we have is a raw pointer.
-        let si = unsafe{*store.offset(index as isize)};
-        let value_stack = self.value_stack.borrow();
-        if si < value_stack.len() && value_stack[si].index == index {
-            let result: *const T = &value_stack[si].value;
-            // XXX The value is guaranteed to live as long
-            // as the borrow of self, by construction of
-            // this datatype.
-            return unsafe{result.as_ref::<'a>()}.unwrap()
-        }
-        unimplemented!()
+        self.get_mut_ref(index, None)
     }
 }
