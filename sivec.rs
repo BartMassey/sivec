@@ -4,6 +4,7 @@ use alloc::raw_vec::RawVec;
 use alloc::heap::Heap;
 use std::ops::{Index, IndexMut};
 use std::cell::RefCell;
+use std::mem;
 
 enum Initializer<'a, T: 'a + Clone> {
     None,
@@ -44,7 +45,8 @@ impl <'a, T: Clone> SIVec<'a, T> {
         }
     }
 
-    pub fn with_constructor(capacity: usize, constructor: &'a Fn(usize) -> T)
+    pub fn with_constructor(capacity: usize,
+                            constructor: &'a Fn(usize) -> T)
                             -> SIVec<'a, T> {
         SIVec {
             value_stack: RefCell::new(Vec::new()),
@@ -53,8 +55,8 @@ impl <'a, T: Clone> SIVec<'a, T> {
         }
     }
 
-    fn get_mut_ref(&'a self, index: usize, value: Option<T>)
-                       -> &'a mut T {
+    fn get_mut_ref(&'a self, index: usize, need_default: bool)
+                   -> &'a mut T {
         if index >= self.vec.cap() {
             panic!("SIVec: index bounds");
         }
@@ -67,23 +69,26 @@ impl <'a, T: Clone> SIVec<'a, T> {
         let vsl = value_stack.len();
         if si < vsl && value_stack[si].index == index {
             let result: *mut T = &mut value_stack[si].value;
-            if let Some(init) = value {
-                // XXX Easier to just write through our pointer.
-                unsafe{*result = init}
-            }
             // XXX The value is guaranteed to live as long
             // as the borrow of self, by construction of
             // this datatype.
             return unsafe{result.as_mut::<'a>()}.unwrap()
         }
-        let init = match value {
-            Some(v) => v,
-            None => match self.initializer {
-                Initializer::None => panic!("SIVec: unable to initialize"),
-                Initializer::Const(ref v) => v.clone(),
-                Initializer::Closure(ref f) => (*f)(index).clone()
-            }
-        };
+        let init =
+            if need_default {
+                match self.initializer {
+                    Initializer::None =>
+                        panic!("SIVec: unable to initialize"),
+                    Initializer::Const(ref v) =>
+                        v.clone(),
+                    Initializer::Closure(ref f) =>
+                        (*f)(index).clone()
+                }
+            } else {
+                // XXX The caller is committed to immediately
+                // initializing this cell.
+                unsafe{mem::uninitialized()}
+            };
         let new_value = Value {
             value: init,
             index: index
@@ -97,11 +102,12 @@ impl <'a, T: Clone> SIVec<'a, T> {
     }
 
     pub fn set(&self, index: usize, value: T) {
-        let _ = self.get_mut_ref(index, Some(value));
+        let v = self.get_mut_ref(index, false);
+        *v = value;
     }
 
     pub fn get(&self, index: usize) -> &T {
-        self.get_mut_ref(index, None)
+        self.get_mut_ref(index, true)
     }
 }
 
@@ -109,21 +115,26 @@ impl <'a, T: Clone> Index<usize> for SIVec<'a, T> {
     type Output = T;
 
     fn index<'b>(&'b self, index: usize) -> &'b T {
-        self.get_mut_ref(index, None)
+        self.get_mut_ref(index, true)
     }
 }
 
 impl <'a, T: Clone> IndexMut<usize> for SIVec<'a, T> {
     fn index_mut(&mut self, index: usize) -> &mut T {
-        self.get_mut_ref(index, None)
+        // XXX Since we can't know whether the caller
+        // will initialize the value, we need to
+        // provide a default value before returning.
+        self.get_mut_ref(index, true)
     }
 }
 
 #[test]
 fn basic_test() {
-    let v = SIVec::new(10);
+    let mut v = SIVec::new(10);
     v.set(3, 'a');
     assert_eq!(v[3], 'a');
+    v[3] = 'b';
+    assert_eq!(v[3], 'b');
 
     let mut v = SIVec::with_default(10, 'b');
     v[3] = 'a';
@@ -132,7 +143,10 @@ fn basic_test() {
     v[4] = 'c';
     assert_eq!(v[3], 'a');
     assert_eq!(v[4], 'c');
+    assert_eq!(v[5], 'b');
     v[3] = 'b';
     assert_eq!(v[3], 'b');
     assert_eq!(v[4], 'c');
+    assert_eq!(v[5], 'b');
+    assert_eq!(v[6], 'b');
 }
