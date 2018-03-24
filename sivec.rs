@@ -128,6 +128,9 @@ impl <'a, T: Clone> IndexMut<usize> for SIVec<'a, T> {
     }
 }
 
+#[cfg(test)]
+use std::char;
+
 #[test]
 fn basic_test() {
     let mut v = SIVec::new(10);
@@ -149,4 +152,9 @@ fn basic_test() {
     assert_eq!(v[4], 'c');
     assert_eq!(v[5], 'b');
     assert_eq!(v[6], 'b');
+
+    let init = |i| char::from_u32('a' as u32 + i as u32).unwrap();
+    let v = SIVec::with_constructor(10, &init);
+    assert_eq!(v[0], 'a');
+    assert_eq!(v[2], 'c');
 }
