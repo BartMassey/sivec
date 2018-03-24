@@ -7,6 +7,10 @@
 name = "sivec"
 version = "0.1.0"
 authors = ["Bart Massey <bart@cs.pdx.edu>"]
+license-file = "LICENSE"
+repository = "https://github.com/BartMassey/siarray"
+description = "Self-initializing Vector"
+keywords = ["vector", "initialization", "sparse"]
 
 [dependencies]
 
