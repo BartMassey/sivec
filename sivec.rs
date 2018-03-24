@@ -4,6 +4,16 @@
 // Please see the file LICENSE in the source
 // distribution of this software for license terms.
 
+//! A "self-initializing" vector. This data structure offers
+//! O(1) indexing and O(1) initialization: an element is
+//! lazily initialized upon first reference as needed.
+//!
+//! The implementation uses a large index vector of
+//! initially uninitialized memory, together with a stack of
+//! stored values. As such, it will occupy space proportional
+//! to its capacity, and additional space proportional to the
+//! number of stored elements.
+
 extern crate alloc;
 use alloc::raw_vec::RawVec;
 use alloc::heap::Heap;
@@ -22,44 +32,68 @@ struct Value<T> {
     index: usize
 }
 
-// We are stuck with interior mutability by the definition
-// of `Index::index`, which takes `self` as an immutable
-// reference.
+// The basic strategy of this data structure is to keep a
+// `RawVec` index vector and a stack of allocated values.  A
+// given index has a valid value if its index vector points
+// into the stack and the stack element it points to shows
+// the same index. Otherwise, the data structure can be
+// adjusted to make this true, creating a default value as
+// needed.
 
+/// A "self-initializing" vector.
 pub struct SIVec<'a, T: 'a + Clone> {
+    // We are stuck with interior mutability by the definition
+    // of `Index::index`, which takes `self` as an immutable
+    // reference.
     value_stack: RefCell<Vec<Value<T>>>,
     vec: RawVec<usize, Heap>,
     initializer: Initializer<'a, T>
 }
     
 impl <'a, T: Clone> SIVec<'a, T> {
-    pub fn new(capacity: usize) -> SIVec<'a, T> {
+
+    /// Create a new `SIVec` with the given (fixed)
+    /// capacity.  Since no initialization is provided, if a
+    /// given index is read before first write the access
+    /// will panic.
+    pub fn new(cap: usize) -> SIVec<'a, T> {
         SIVec {
             value_stack: RefCell::new(Vec::new()),
-            vec: RawVec::with_capacity(capacity),
+            vec: RawVec::with_capacity(cap),
             initializer: Initializer::None
         }
     }
 
-    pub fn with_default(capacity: usize, default: T)
-                        -> SIVec<'a, T> {
+    /// Create a new `SIVec` with the given (fixed)
+    /// capacity. If a given index is read before first write,
+    /// a clone of the given default value will be supplied.
+    pub fn with_init(cap: usize, default: T) -> SIVec<'a, T> {
         SIVec {
             value_stack: RefCell::new(Vec::new()),
-            vec: RawVec::with_capacity(capacity),
+            vec: RawVec::with_capacity(cap),
             initializer: Initializer::Const(default)
         }
     }
 
-    pub fn with_constructor(capacity: usize,
-                            constructor: &'a Fn(usize) -> T)
-                            -> SIVec<'a, T> {
+    /// Create a new `SIVec` with the given (fixed)
+    /// capacity. If a given index `i` is read before first
+    /// write, the `init_fn` will be called with `i` to get
+    /// a default value.
+    pub fn with_init_fn(cap: usize, init_fn: &'a Fn(usize) -> T)
+                        -> SIVec<'a, T> {
         SIVec {
             value_stack: RefCell::new(Vec::new()),
-            vec: RawVec::with_capacity(capacity),
-            initializer: Initializer::Closure(constructor)
+            vec: RawVec::with_capacity(cap),
+            initializer: Initializer::Closure(init_fn)
         }
     }
 
+    // The heart of all this mess. This function will return
+    // either a mutable reference to an existing value stored
+    // notionally at the given `index`, or will allocate
+    // a new value and return a mutable reference to that.
+    // In the second case, if `need_default` is true, this
+    // function will instead panic.
     fn get_mut_ref(&'a self, index: usize, need_default: bool)
                    -> &'a mut T {
         if index >= self.vec.cap() {
@@ -106,20 +140,54 @@ impl <'a, T: Clone> SIVec<'a, T> {
         return unsafe{result.as_mut::<'a>()}.unwrap()
     }
 
+    /// Set the given location to have the given value.
+    /// This is potentially more efficient than storing
+    /// through an index: in the index case, a default value
+    /// will be created and then immediately replaced.
+    /// For the same reason, this is the only way to
+    /// initially set a value at a given index when no
+    /// default has been supplied.
+    ///
+    /// # Examples
+    /// 
+    /// ```
+    /// let v = sivec::SIVec::new(12);
+    /// v.set(3, 'a');
+    /// assert_eq!(v[3], 'a');
+    /// ```
     pub fn set(&self, index: usize, value: T) {
         let v = self.get_mut_ref(index, false);
         *v = value;
     }
 
+    /// Get an immutable reference to the location holding
+    /// the given value. When applied to an uninitialized
+    /// index, this function will store a default value
+    /// there, or panic if this is not possible.
+    ///
+    /// It is usually more convenient to use indexing
+    /// than this function.
+    /// 
+    /// # Examples
+    /// 
+    /// ```
+    /// let v = sivec::SIVec::with_init(12, 'a');
+    /// assert_eq!(*v.get(3), 'a');
+    /// ```
     pub fn get(&self, index: usize) -> &T {
         self.get_mut_ref(index, true)
+    }
+
+    /// Report the capacity of this structure.
+    pub fn cap(&self) -> usize {
+        self.vec.cap()
     }
 }
 
 impl <'a, T: Clone> Index<usize> for SIVec<'a, T> {
     type Output = T;
 
-    fn index<'b>(&'b self, index: usize) -> &'b T {
+    fn index(&self, index: usize) -> &T {
         self.get_mut_ref(index, true)
     }
 }
@@ -144,7 +212,7 @@ fn basic_test() {
     v[3] = 'b';
     assert_eq!(v[3], 'b');
 
-    let mut v = SIVec::with_default(10, 'b');
+    let mut v = SIVec::with_init(10, 'b');
     v[3] = 'a';
     assert_eq!(v[3], 'a');
     assert_eq!(v[4], 'b');
@@ -159,7 +227,7 @@ fn basic_test() {
     assert_eq!(v[6], 'b');
 
     let init = |i| char::from_u32('a' as u32 + i as u32).unwrap();
-    let v = SIVec::with_constructor(10, &init);
+    let v = SIVec::with_init_fn(10, &init);
     assert_eq!(v[0], 'a');
     assert_eq!(v[2], 'c');
 }
