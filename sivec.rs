@@ -120,8 +120,8 @@ impl <'a, T: Clone> SIVec<'a, T> {
                         panic!("SIVec: unable to initialize"),
                     Initializer::Const(ref v) =>
                         v.clone(),
-                    Initializer::Closure(ref f) =>
-                        (*f)(index).clone()
+                    Initializer::Closure(f) =>
+                        f(index)
                 }
             } else {
                 // XXX The caller is committed to immediately
