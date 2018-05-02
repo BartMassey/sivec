@@ -1,4 +1,3 @@
-#![feature(alloc)]
 // Copyright © 2018 Bart Massey
 // [This program is licensed under the "MIT License"]
 // Please see the file LICENSE in the source
@@ -14,8 +13,6 @@
 //! to its capacity, and additional space proportional to the
 //! number of stored elements.
 
-extern crate alloc;
-use alloc::raw_vec::RawVec;
 use std::ops::{Index, IndexMut};
 use std::cell::RefCell;
 use std::mem;
@@ -25,13 +22,13 @@ struct Value<T> {
     index: usize
 }
 
-// The basic strategy of this data structure is to keep a
-// `RawVec` index vector and a stack of allocated values.  A
-// given index has a valid value if its index vector points
-// into the stack and the stack element it points to shows
-// the same index. Otherwise, the data structure can be
-// adjusted to make this true, creating a default value as
-// needed.
+// The basic strategy of this data structure is to keep an
+// initially-uninitialized index vector and a stack of
+// allocated values.  A given index has a valid value if its
+// index vector points into the stack and the stack element
+// it points to shows the same index. Otherwise, the data
+// structure can be adjusted to make this true, creating a
+// default value as needed.
 
 /// A "self-initializing" vector.
 pub struct SIVec<T> {
@@ -39,7 +36,7 @@ pub struct SIVec<T> {
     // of `Index::index`, which takes `self` as an immutable
     // reference.
     value_stack: RefCell<Vec<Value<T>>>,
-    vec: RawVec<usize>,
+    vec: Vec<usize>,
     initializer: Box<Fn(usize)->T + 'static>,
 }
     
@@ -52,7 +49,7 @@ impl <T> SIVec<T> {
     pub fn new(cap: usize) -> SIVec<T> {
         SIVec {
             value_stack: RefCell::new(Vec::new()),
-            vec: RawVec::with_capacity(cap),
+            vec: Vec::with_capacity(cap),
             initializer: Box::new(|_| panic!("no initializer for SIVec")),
         }
     }
@@ -64,7 +61,7 @@ impl <T> SIVec<T> {
      where T: Clone, T: 'static {
         SIVec {
             value_stack: RefCell::new(Vec::new()),
-            vec: RawVec::with_capacity(cap),
+            vec: Vec::with_capacity(cap),
             initializer: Box::new(move |_| value.clone()),
         }
     }
@@ -77,7 +74,7 @@ impl <T> SIVec<T> {
      where F: Fn(usize)->T + 'static {
         SIVec {
             value_stack: RefCell::new(Vec::new()),
-            vec: RawVec::with_capacity(cap),
+            vec: Vec::with_capacity(cap),
             initializer: Box::new(init_fn),
         }
     }
@@ -90,10 +87,10 @@ impl <T> SIVec<T> {
     // function will instead panic.
     fn get_mut_ref(&self, index: usize, need_default: bool)
                    -> &mut T {
-        if index >= self.vec.cap() {
+        if index >= self.vec.capacity() {
             panic!("SIVec: index bounds");
         }
-        let store = self.vec.ptr();
+        let store = self.vec.as_ptr() as *mut usize;
         let ip = unsafe{store.offset(index as isize)};
         // XXX Need to do an unsafe read because
         // all we have is a raw pointer.
@@ -167,7 +164,7 @@ impl <T> SIVec<T> {
 
     /// Report the capacity of this structure.
     pub fn cap(&self) -> usize {
-        self.vec.cap()
+        self.vec.capacity()
     }
 }
 
