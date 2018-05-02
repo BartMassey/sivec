@@ -1,4 +1,4 @@
-#![feature(alloc, allocator_api, core_intrinsics)]
+#![feature(alloc)]
 // Copyright © 2018 Bart Massey
 // [This program is licensed under the "MIT License"]
 // Please see the file LICENSE in the source
@@ -16,7 +16,6 @@
 
 extern crate alloc;
 use alloc::raw_vec::RawVec;
-use alloc::heap::Global;
 use std::ops::{Index, IndexMut};
 use std::cell::RefCell;
 use std::mem;
@@ -40,7 +39,7 @@ pub struct SIVec<T> {
     // of `Index::index`, which takes `self` as an immutable
     // reference.
     value_stack: RefCell<Vec<Value<T>>>,
-    vec: RawVec<usize, Global>,
+    vec: RawVec<usize>,
     initializer: Box<Fn(usize)->T + 'static>,
 }
     
