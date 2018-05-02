@@ -16,16 +16,10 @@
 
 extern crate alloc;
 use alloc::raw_vec::RawVec;
-use alloc::heap::Heap;
+use alloc::heap::Global;
 use std::ops::{Index, IndexMut};
 use std::cell::RefCell;
 use std::mem;
-
-enum Initializer<'a, T: 'a + Clone> {
-    None,
-    Const(T),
-    Closure(&'a Fn(usize) -> T)
-}
 
 struct Value<T> {
     value: T,
@@ -41,37 +35,38 @@ struct Value<T> {
 // needed.
 
 /// A "self-initializing" vector.
-pub struct SIVec<'a, T: 'a + Clone> {
+pub struct SIVec<T> {
     // We are stuck with interior mutability by the definition
     // of `Index::index`, which takes `self` as an immutable
     // reference.
     value_stack: RefCell<Vec<Value<T>>>,
-    vec: RawVec<usize, Heap>,
-    initializer: Initializer<'a, T>
+    vec: RawVec<usize, Global>,
+    initializer: Box<Fn(usize)->T + 'static>,
 }
     
-impl <'a, T: Clone> SIVec<'a, T> {
+impl <T> SIVec<T> {
 
     /// Create a new `SIVec` with the given (fixed)
     /// capacity.  Since no initialization is provided, if a
     /// given index is read before first write the access
     /// will panic.
-    pub fn new(cap: usize) -> SIVec<'a, T> {
+    pub fn new(cap: usize) -> SIVec<T> {
         SIVec {
             value_stack: RefCell::new(Vec::new()),
             vec: RawVec::with_capacity(cap),
-            initializer: Initializer::None
+            initializer: Box::new(|_| panic!("no initializer for SIVec")),
         }
     }
 
     /// Create a new `SIVec` with the given (fixed)
     /// capacity. If a given index is read before first write,
     /// a clone of the given default value will be supplied.
-    pub fn with_init(cap: usize, default: T) -> SIVec<'a, T> {
+    pub fn with_init(cap: usize, value: T) -> SIVec<T>
+     where T: Clone, T: 'static {
         SIVec {
             value_stack: RefCell::new(Vec::new()),
             vec: RawVec::with_capacity(cap),
-            initializer: Initializer::Const(default)
+            initializer: Box::new(move |_| value.clone()),
         }
     }
 
@@ -79,12 +74,12 @@ impl <'a, T: Clone> SIVec<'a, T> {
     /// capacity. If a given index `i` is read before first
     /// write, the `init_fn` will be called with `i` to get
     /// a default value.
-    pub fn with_init_fn(cap: usize, init_fn: &'a Fn(usize) -> T)
-                        -> SIVec<'a, T> {
+    pub fn with_init_fn<F>(cap: usize, init_fn: F) -> SIVec<T>
+     where F: Fn(usize)->T + 'static {
         SIVec {
             value_stack: RefCell::new(Vec::new()),
             vec: RawVec::with_capacity(cap),
-            initializer: Initializer::Closure(init_fn)
+            initializer: Box::new(init_fn),
         }
     }
 
@@ -94,8 +89,8 @@ impl <'a, T: Clone> SIVec<'a, T> {
     // a new value and return a mutable reference to that.
     // In the second case, if `need_default` is true, this
     // function will instead panic.
-    fn get_mut_ref(&'a self, index: usize, need_default: bool)
-                   -> &'a mut T {
+    fn get_mut_ref(&self, index: usize, need_default: bool)
+                   -> &mut T {
         if index >= self.vec.cap() {
             panic!("SIVec: index bounds");
         }
@@ -111,18 +106,11 @@ impl <'a, T: Clone> SIVec<'a, T> {
             // XXX The value is guaranteed to live as long
             // as the borrow of self, by construction of
             // this datatype.
-            return unsafe{result.as_mut::<'a>()}.unwrap()
+            return unsafe{result.as_mut()}.unwrap()
         }
         let init =
             if need_default {
-                match self.initializer {
-                    Initializer::None =>
-                        panic!("SIVec: unable to initialize"),
-                    Initializer::Const(ref v) =>
-                        v.clone(),
-                    Initializer::Closure(f) =>
-                        f(index)
-                }
+                (*self.initializer)(index)
             } else {
                 // XXX The caller is committed to immediately
                 // initializing this cell.
@@ -137,7 +125,7 @@ impl <'a, T: Clone> SIVec<'a, T> {
         unsafe{*ip = vsl};
         let result: *mut T = &mut value_stack[vsl].value;
         // XXX See existing case above.
-        return unsafe{result.as_mut::<'a>()}.unwrap()
+        return unsafe{result.as_mut()}.unwrap()
     }
 
     /// Set the given location to have the given value.
@@ -184,7 +172,7 @@ impl <'a, T: Clone> SIVec<'a, T> {
     }
 }
 
-impl <'a, T: Clone> Index<usize> for SIVec<'a, T> {
+impl <T> Index<usize> for SIVec<T> {
     type Output = T;
 
     fn index(&self, index: usize) -> &T {
@@ -192,7 +180,7 @@ impl <'a, T: Clone> Index<usize> for SIVec<'a, T> {
     }
 }
 
-impl <'a, T: Clone> IndexMut<usize> for SIVec<'a, T> {
+impl <T> IndexMut<usize> for SIVec<T> {
     fn index_mut(&mut self, index: usize) -> &mut T {
         // XXX Since we can't know whether the caller
         // will initialize the value, we need to
@@ -200,9 +188,6 @@ impl <'a, T: Clone> IndexMut<usize> for SIVec<'a, T> {
         self.get_mut_ref(index, true)
     }
 }
-
-#[cfg(test)]
-use std::char;
 
 #[test]
 fn basic_test() {
@@ -226,8 +211,8 @@ fn basic_test() {
     assert_eq!(v[5], 'b');
     assert_eq!(v[6], 'b');
 
-    let init = |i| char::from_u32('a' as u32 + i as u32).unwrap();
-    let v = SIVec::with_init_fn(10, &init);
+    let init = |i| std::char::from_u32('a' as u32 + i as u32).unwrap();
+    let v = SIVec::with_init_fn(10, init);
     assert_eq!(v[0], 'a');
     assert_eq!(v[2], 'c');
 }
