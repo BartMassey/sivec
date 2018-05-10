@@ -15,7 +15,6 @@
 
 use std::ops::{Index, IndexMut};
 use std::cell::RefCell;
-use std::mem;
 
 struct Value<T> {
     value: T,
@@ -80,12 +79,17 @@ impl <T> SIVec<T> {
     }
 
     // The heart of all this mess. This function will return
-    // either a mutable reference to an existing value stored
-    // notionally at the given `index`, or will allocate
-    // a new value and return a mutable reference to that.
-    // In the second case, if `need_default` is true, this
-    // function will instead panic.
-    fn get_mut_ref(&self, index: usize, need_default: bool)
+    // a mutable reference to storage for a value stored
+    // notionally at the given `index`.
+    //
+    // In the case that this is a reference to a
+    // previously-uninitialized location, the behavior of
+    // this function will depend on the `value` argument. If
+    // value is `None`, the storage will be initialized with
+    // a value obtained from the `self` initializer,
+    // panicking if no initializer was provided. Otherwise,
+    // the storage will be initialized with the given value.
+    fn get_mut_ref(&self, index: usize, value: Option<T>)
                    -> &mut T {
         if index >= self.vec.capacity() {
             panic!("SIVec: index bounds");
@@ -104,19 +108,12 @@ impl <T> SIVec<T> {
             // this datatype.
             return unsafe{result.as_mut()}.unwrap()
         }
-        let init =
-            if need_default {
-                (*self.initializer)(index)
-            } else {
-                // XXX The caller is committed to immediately
-                // initializing this cell.
-                unsafe{mem::uninitialized()}
-            };
-        let new_value = Value {
-            value: init,
-            index: index
+        let value = match value {
+            None => (*self.initializer)(index),
+            Some(value) => value,
         };
-        value_stack.push(new_value);
+        let value = Value { value, index };
+        value_stack.push(value);
         // XXX Initialize the index.
         unsafe{*ip = vsl};
         let result: *mut T = &mut value_stack[vsl].value;
@@ -140,8 +137,7 @@ impl <T> SIVec<T> {
     /// assert_eq!(v[3], 'a');
     /// ```
     pub fn set(&self, index: usize, value: T) {
-        let v = self.get_mut_ref(index, false);
-        *v = value;
+        let _ = self.get_mut_ref(index, Some(value));
     }
 
     /// Get an immutable reference to the location holding
@@ -159,7 +155,7 @@ impl <T> SIVec<T> {
     /// assert_eq!(*v.get(3), 'a');
     /// ```
     pub fn get(&self, index: usize) -> &T {
-        self.get_mut_ref(index, true)
+        self.get_mut_ref(index, None)
     }
 
     /// Report the capacity of this structure.
@@ -172,7 +168,7 @@ impl <T> Index<usize> for SIVec<T> {
     type Output = T;
 
     fn index(&self, index: usize) -> &T {
-        self.get_mut_ref(index, true)
+        self.get_mut_ref(index, None)
     }
 }
 
@@ -181,7 +177,7 @@ impl <T> IndexMut<usize> for SIVec<T> {
         // XXX Since we can't know whether the caller
         // will initialize the value, we need to
         // provide a default value before returning.
-        self.get_mut_ref(index, true)
+        self.get_mut_ref(index, None)
     }
 }
 
