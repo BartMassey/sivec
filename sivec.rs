@@ -132,11 +132,11 @@ impl <T> SIVec<T> {
     /// # Examples
     /// 
     /// ```
-    /// let v = sivec::SIVec::new(12);
+    /// let mut v = sivec::SIVec::new(12);
     /// v.set(3, 'a');
     /// assert_eq!(v[3], 'a');
     /// ```
-    pub fn set(&self, index: usize, value: T) {
+    pub fn set(&mut self, index: usize, value: T) {
         let _ = self.get_mut_ref(index, Some(value));
     }
 
