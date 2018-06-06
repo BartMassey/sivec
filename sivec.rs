@@ -95,7 +95,17 @@ impl <T> SIVec<T> {
             panic!("SIVec: index bounds");
         }
         let store = self.vec.as_ptr() as *mut usize;
-        let ip = unsafe{store.offset(index as isize)};
+        let ip = unsafe {
+            let (base, amount) = if index > std::isize::MAX as usize {
+                let remaining = (index - std::isize::MAX as usize) as isize;
+                (store.offset(std::isize::MAX), remaining)
+            } else {
+                (store, index as isize)
+            };
+
+            base.offset(amount)
+        };
+
         // XXX Need to do an unsafe read because
         // all we have is a raw pointer.
         let si = unsafe{*ip};
