@@ -13,6 +13,7 @@
 //! to its capacity, and additional space proportional to the
 //! number of stored elements.
 
+use std::isize;
 use std::ops::{Index, IndexMut};
 use std::cell::RefCell;
 
@@ -44,8 +45,14 @@ impl <T> SIVec<T> {
     /// Create a new `SIVec` with the given (fixed)
     /// capacity.  Since no initialization is provided, if a
     /// given index is read before first write the access
-    /// will panic.
+    /// will panic. The maximum allowed capacity is `std::isize::MAX`.
+    ///
+    /// # Panics
+    ///
+    /// Will panic with a failed assertion if called with a
+    /// capacity exceeding the allowed bound.
     pub fn new(cap: usize) -> SIVec<T> {
+        assert!(cap <= isize::MAX as usize);
         SIVec {
             value_stack: RefCell::new(Vec::new()),
             vec: Vec::with_capacity(cap),
@@ -54,10 +61,19 @@ impl <T> SIVec<T> {
     }
 
     /// Create a new `SIVec` with the given (fixed)
-    /// capacity. If a given index is read before first write,
-    /// a clone of the given default value will be supplied.
+    /// capacity. If a given index is read before first
+    /// write, a clone of the given default value will be
+    /// supplied.  The maximum allowed capacity is
+    /// `std::isize::MAX`.
+    ///
+    /// # Panics
+    ///
+    /// Will panic with a failed assertion if called with a
+    /// capacity exceeding the allowed bound.
     pub fn with_init(cap: usize, value: T) -> SIVec<T>
-     where T: Clone, T: 'static {
+        where T: Clone, T: 'static
+    {
+        assert!(cap <= isize::MAX as usize);
         SIVec {
             value_stack: RefCell::new(Vec::new()),
             vec: Vec::with_capacity(cap),
@@ -68,9 +84,17 @@ impl <T> SIVec<T> {
     /// Create a new `SIVec` with the given (fixed)
     /// capacity. If a given index `i` is read before first
     /// write, the `init_fn` will be called with `i` to get
-    /// a default value.
+    /// a default value.  The maximum allowed capacity is
+    /// `std::isize::MAX`.
+    ///
+    /// # Panics
+    ///
+    /// Will panic with a failed assertion if called with a
+    /// capacity exceeding the allowed bound.
     pub fn with_init_fn<F>(cap: usize, init_fn: F) -> SIVec<T>
-     where F: Fn(usize)->T + 'static {
+        where F: Fn(usize)->T + 'static
+    {
+        assert!(cap <= isize::MAX as usize);
         SIVec {
             value_stack: RefCell::new(Vec::new()),
             vec: Vec::with_capacity(cap),
@@ -89,12 +113,15 @@ impl <T> SIVec<T> {
     // a value obtained from the `self` initializer,
     // panicking if no initializer was provided. Otherwise,
     // the storage will be initialized with the given value.
-    fn get_mut_ref(&self, index: usize, value: Option<T>)
-                   -> &mut T {
+    fn get_mut_ref(&self, index: usize, value: Option<T>) -> &mut T {
         if index >= self.vec.capacity() {
             panic!("SIVec: index bounds");
         }
         let store = self.vec.as_ptr() as *mut usize;
+        // This offset will not overflow. The capacity is
+        // guaranteed to be less than `isize::MAX` by the
+        // constructors, and we have checked the bound
+        // above.
         let ip = unsafe{store.offset(index as isize)};
         // XXX Need to do an unsafe read because
         // all we have is a raw pointer.
