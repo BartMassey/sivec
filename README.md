@@ -1,8 +1,11 @@
 # SIVec: Rust "self-initializing" vector
 Copyright (c) 2018 Bart Massey
 
-This crate implements a "self-initializing" vector: elements
-are lazily initialized upon first reference.
+This crate implements a "self-initializing" vector.  A
+self-initializing vector stores values at a sparse
+collection of indices, using storage linear in the number of
+stored values. Values are created and initialized on first
+reference.
 
 I was told about this data structure in grad school at some
 point, but don't have a reference handy. If someone else
