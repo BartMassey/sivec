@@ -13,13 +13,13 @@
 //! to its capacity, and additional space proportional to the
 //! number of stored elements.
 
+use std::cell::RefCell;
 use std::isize;
 use std::ops::{Index, IndexMut};
-use std::cell::RefCell;
 
 struct Value<T> {
     value: T,
-    index: usize
+    index: usize,
 }
 
 // The basic strategy of this data structure is to keep an
@@ -37,11 +37,10 @@ pub struct SIVec<T> {
     // reference.
     value_stack: RefCell<Vec<Value<T>>>,
     vec: Vec<usize>,
-    initializer: Box<Fn(usize)->T + 'static>,
+    initializer: Box<dyn Fn(usize) -> T + 'static>,
 }
-    
-impl <T> SIVec<T> {
 
+impl<T> SIVec<T> {
     /// Create a new `SIVec` with the given (fixed)
     /// capacity.  Since no initialization is provided, if a
     /// given index is read before first write the access
@@ -71,7 +70,9 @@ impl <T> SIVec<T> {
     /// Will panic with a failed assertion if called with a
     /// capacity exceeding the allowed bound.
     pub fn with_init(cap: usize, value: T) -> SIVec<T>
-        where T: Clone, T: 'static
+    where
+        T: Clone,
+        T: 'static,
     {
         assert!(cap <= isize::MAX as usize);
         SIVec {
@@ -92,7 +93,8 @@ impl <T> SIVec<T> {
     /// Will panic with a failed assertion if called with a
     /// capacity exceeding the allowed bound.
     pub fn with_init_fn<F>(cap: usize, init_fn: F) -> SIVec<T>
-        where F: Fn(usize)->T + 'static
+    where
+        F: Fn(usize) -> T + 'static,
     {
         assert!(cap <= isize::MAX as usize);
         SIVec {
@@ -122,10 +124,10 @@ impl <T> SIVec<T> {
         // guaranteed to be less than `isize::MAX` by the
         // constructors, and we have checked the bound
         // above.
-        let ip = unsafe{store.offset(index as isize)};
+        let ip = unsafe { store.offset(index as isize) };
         // XXX Need to do an unsafe read because
         // all we have is a raw pointer.
-        let si = unsafe{*ip};
+        let si = unsafe { *ip };
         let mut value_stack = self.value_stack.borrow_mut();
         let vsl = value_stack.len();
         if si < vsl && value_stack[si].index == index {
@@ -133,7 +135,7 @@ impl <T> SIVec<T> {
             // XXX The value is guaranteed to live as long
             // as the borrow of self, by construction of
             // this datatype.
-            return unsafe{result.as_mut()}.unwrap()
+            return unsafe { result.as_mut() }.unwrap();
         }
         let value = match value {
             None => (*self.initializer)(index),
@@ -142,10 +144,10 @@ impl <T> SIVec<T> {
         let value = Value { value, index };
         value_stack.push(value);
         // XXX Initialize the index.
-        unsafe{*ip = vsl};
+        unsafe { *ip = vsl };
         let result: *mut T = &mut value_stack[vsl].value;
         // XXX See existing case above.
-        return unsafe{result.as_mut()}.unwrap()
+        return unsafe { result.as_mut() }.unwrap();
     }
 
     /// Set the given location to have the given value.
@@ -157,7 +159,7 @@ impl <T> SIVec<T> {
     /// default has been supplied.
     ///
     /// # Examples
-    /// 
+    ///
     /// ```
     /// let mut v = sivec::SIVec::new(12);
     /// v.set(3, 'a');
@@ -174,9 +176,9 @@ impl <T> SIVec<T> {
     ///
     /// It is usually more convenient to use indexing
     /// than this function.
-    /// 
+    ///
     /// # Examples
-    /// 
+    ///
     /// ```
     /// let v = sivec::SIVec::with_init(12, 'a');
     /// assert_eq!(*v.get(3), 'a');
@@ -191,7 +193,7 @@ impl <T> SIVec<T> {
     }
 }
 
-impl <T> Index<usize> for SIVec<T> {
+impl<T> Index<usize> for SIVec<T> {
     type Output = T;
 
     fn index(&self, index: usize) -> &T {
@@ -199,7 +201,7 @@ impl <T> Index<usize> for SIVec<T> {
     }
 }
 
-impl <T> IndexMut<usize> for SIVec<T> {
+impl<T> IndexMut<usize> for SIVec<T> {
     fn index_mut(&mut self, index: usize) -> &mut T {
         // XXX Since we can't know whether the caller
         // will initialize the value, we need to
