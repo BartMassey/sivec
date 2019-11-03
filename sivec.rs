@@ -37,7 +37,7 @@ pub struct SIVec<T> {
     // reference.
     value_stack: RefCell<Vec<Value<T>>>,
     vec: Vec<usize>,
-    initializer: Box<Fn(usize) -> T + 'static>,
+    initializer: Box<dyn Fn(usize) -> T + 'static>,
 }
 
 impl<T> SIVec<T> {
