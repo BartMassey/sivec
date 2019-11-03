@@ -116,8 +116,7 @@ impl<T> SIVec<T> {
     // a value obtained from the `self` initializer,
     // panicking if no initializer was provided. Otherwise,
     // the storage will be initialized with the given value.
-    #[allow(clippy::mut_from_ref)]
-    fn get_mut_ref(&self, index: usize, value: Option<T>) -> &mut T {
+    fn get_mut_ref(&self, index: usize, value: Option<T>) -> *mut T {
         if index >= self.vec.capacity() {
             panic!("SIVec: index bounds");
         }
@@ -147,9 +146,7 @@ impl<T> SIVec<T> {
         value_stack.push(value);
         // XXX Initialize the index.
         unsafe { *ip = vsl };
-        let result: *mut T = &mut value_stack[vsl].value;
-        // XXX See existing case above.
-        unsafe { result.as_mut() }.unwrap()
+        &mut value_stack[vsl].value
     }
 
     /// Set the given location to have the given value.
@@ -186,7 +183,8 @@ impl<T> SIVec<T> {
     /// assert_eq!(*v.get(3), 'a');
     /// ```
     pub fn get(&self, index: usize) -> &T {
-        self.get_mut_ref(index, None)
+        let ptr = self.get_mut_ref(index, None);
+        unsafe { ptr.as_mut() }.unwrap()
     }
 
     /// Report the capacity of this structure.
@@ -199,7 +197,8 @@ impl<T> Index<usize> for SIVec<T> {
     type Output = T;
 
     fn index(&self, index: usize) -> &T {
-        self.get_mut_ref(index, None)
+        let ptr = self.get_mut_ref(index, None);
+        unsafe { ptr.as_ref() }.unwrap()
     }
 }
 
@@ -208,7 +207,8 @@ impl<T> IndexMut<usize> for SIVec<T> {
         // XXX Since we can't know whether the caller
         // will initialize the value, we need to
         // provide a default value before returning.
-        self.get_mut_ref(index, None)
+        let ptr = self.get_mut_ref(index, None);
+        unsafe { ptr.as_mut() }.unwrap()
     }
 }
 
