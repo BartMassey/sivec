@@ -73,8 +73,7 @@ impl<T> SIVec<T> {
     /// capacity exceeding the allowed bound.
     pub fn with_init(cap: usize, value: T) -> SIVec<T>
     where
-        T: Clone,
-        T: 'static,
+        T: Clone + 'static,
     {
         assert!(cap <= isize::MAX as usize);
         SIVec {
@@ -117,6 +116,7 @@ impl<T> SIVec<T> {
     // a value obtained from the `self` initializer,
     // panicking if no initializer was provided. Otherwise,
     // the storage will be initialized with the given value.
+    #[allow(clippy::mut_from_ref)]
     fn get_mut_ref(&self, index: usize, value: Option<T>) -> &mut T {
         if index >= self.vec.capacity() {
             panic!("SIVec: index bounds");
@@ -126,7 +126,7 @@ impl<T> SIVec<T> {
         // guaranteed to be less than `isize::MAX` by the
         // constructors, and we have checked the bound
         // above.
-        let ip = unsafe { store.offset(index as isize) };
+        let ip = unsafe { store.add(index) };
         // XXX Need to do an unsafe read because
         // all we have is a raw pointer.
         let si = unsafe { *ip };
@@ -149,7 +149,7 @@ impl<T> SIVec<T> {
         unsafe { *ip = vsl };
         let result: *mut T = &mut value_stack[vsl].value;
         // XXX See existing case above.
-        return unsafe { result.as_mut() }.unwrap();
+        unsafe { result.as_mut() }.unwrap()
     }
 
     /// Set the given location to have the given value.
