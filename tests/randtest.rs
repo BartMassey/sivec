@@ -1,5 +1,5 @@
-use std::collections::BTreeMap;
 use rand::Rng;
+use std::collections::BTreeMap;
 
 use sivec::*;
 
@@ -7,8 +7,7 @@ use sivec::*;
 fn randtest() {
     const NTESTS: usize = 10000;
     const CAP: usize = 100 * 1024 * 1024;
-    let mut backing: BTreeMap<usize, usize> =
-        BTreeMap::new();
+    let mut backing: BTreeMap<usize, usize> = BTreeMap::new();
     let mut testvec: SIVec<usize> =
         SIVec::with_init_fn(CAP, |t| panic!("{} read before write", t));
     let mut prng = rand::thread_rng();
