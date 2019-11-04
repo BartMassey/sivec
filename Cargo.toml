@@ -6,14 +6,14 @@
 [package]
 name = "sivec"
 version = "0.1.1"
+edition = "2018"
 authors = ["Bart Massey <bart@cs.pdx.edu>"]
 license-file = "LICENSE"
 repository = "https://github.com/BartMassey/siarray"
 description = "Self-initializing Vector"
 keywords = ["vector", "initialization", "sparse"]
 
-[dependencies]
+[dev-dependencies]
+rand = "*"
 
-[lib]
-name = "sivec"
-path = "sivec.rs"
+[dependencies]
