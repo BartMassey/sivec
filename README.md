@@ -7,6 +7,13 @@ collection of indices, using storage linear in the number of
 stored values. Values are created and initialized on first
 reference.
 
+The basic idea is to use an uninitialized array of indices
+into a stack of index-value pairs. When the array of indices
+is referenced, a check is done to see if the stack index is
+valid. If so, the value on the stack is used; otherwise a
+new pair is pushed onto the stack and the indices array is
+set to point at it.
+
 I was told about this data structure in grad school at some
 point, but don't have a reference handy. If someone else
 does it would be appreciated.
