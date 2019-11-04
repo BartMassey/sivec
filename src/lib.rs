@@ -132,11 +132,14 @@ impl<T> SIVec<T> {
         let mut value_stack = self.value_stack.borrow_mut();
         let vsl = value_stack.len();
         if si < vsl && value_stack[si].index == index {
-            let result: *mut T = &mut value_stack[si].value;
+            let vp = &mut value_stack[si].value;
+            if let Some(value) = value {
+                *vp = value;
+            }
             // XXX The value is guaranteed to live as long
             // as the borrow of self, by construction of
             // this datatype.
-            return unsafe { result.as_mut() }.unwrap();
+            return vp;
         }
         let value = match value {
             None => (*self.initializer)(index),
@@ -184,7 +187,7 @@ impl<T> SIVec<T> {
     /// ```
     pub fn get(&self, index: usize) -> &T {
         let ptr = self.get_mut_ref(index, None);
-        unsafe { ptr.as_mut() }.unwrap()
+        unsafe { ptr.as_ref() }.unwrap()
     }
 
     /// Report the capacity of this structure.
