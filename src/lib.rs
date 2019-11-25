@@ -128,6 +128,10 @@ impl<T> SIVec<T> {
         let ip = unsafe { store.add(index) };
         // XXX Need to do an unsafe read because
         // all we have is a raw pointer.
+        // XXX Miri is not happy with this read, since
+        // the memory is known-undefined. I don't think
+        // there's much to be done about this given the
+        // current Rust UB rules.
         let si = unsafe { *ip };
         let mut value_stack = self.value_stack.borrow_mut();
         let vsl = value_stack.len();
