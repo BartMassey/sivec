@@ -25,7 +25,8 @@ is referenced, a check is done to see if the stack index is
 valid. If so, the value on the stack is used; otherwise a
 new pair is pushed onto the stack and the indices array is
 set to point at it. Thus, memory is lazily initialized as it
-used, on-the-fly.
+used, on-the-fly. (For a more detailed description, please
+see the Rustdoc.)
 
 I was told about this data structure in grad school at some
 point, but don't have a reference handy. If someone else
