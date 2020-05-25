@@ -24,23 +24,23 @@
 //! creating a default value as needed.
 //!
 //! ## Data Structure
-//! 
+//!
 //! * We have a stack, which is initially empty.
-//! 
+//!
 //! * Every entry on the stack points to a specific cell in
 //!   the array.
-//! 
+//!
 //! * Every initialized entry in the array points back to
 //! its corresponding entry on the stack. (The uninitialized
 //! entries, obviously, could point anywhere, including onto
 //! the stack.)
-//! 
+//!
 //! ## To read from the array:
-//! 
+//!
 //! * Look up the array entry. See if it points back into
 //! the stack. If so, *check that the stack entry points to
 //! that array entry.*
-//! 
+//!
 //!    * If both pointers are valid and match, the array
 //!    element has been previously initialized, so its
 //!    contents are valid. In this case, finish the
@@ -48,23 +48,23 @@
 //!    or in the array: the stack is a better idea, since
 //!    the array uses vast amounts of VM and the stack will
 //!    be limited-size.)
-//!  
+//!
 //!    * If the array pointer is invalid or the stack
 //!    pointer doesn't match it, the array element is
 //!    uninitialized. Throw an error. (Alternatively,
 //!    initialize as below with some default value and
 //!    return that.)
-//! 
+//!
 //! ## To write to the array:
-//! 
+//!
 //! * Do the same check as the read. If the check passes, overwrite the value.
-//! 
+//!
 //! * If the check fails, push a new entry on the stack,
 //! adjust the stack entry and the array entry to point to
 //! each other, and write the value.
-//! 
+//!
 //! ## Efficiency
-//! 
+//!
 //! Note that every operation is constant-time and consumes
 //! constant space. (We will agree to ignore the giant pile
 //! of uninitialized virtual memory lying in the corner.)
