@@ -90,7 +90,7 @@ pub struct SIVec<T> {
     // reference.
     value_stack: RefCell<Vec<Value<T>>>,
     vec: Vec<usize>,
-    initializer: Box<dyn Fn(usize) -> T + 'static>,
+    initializer: RefCell<Box<dyn Fn(usize) -> T + 'static>>,
 }
 
 impl<T> SIVec<T> {
@@ -108,9 +108,9 @@ impl<T> SIVec<T> {
         SIVec {
             value_stack: RefCell::new(Vec::new()),
             vec: Vec::with_capacity(cap),
-            initializer: Box::new(|_| {
+            initializer: RefCell::new(Box::new(|_| {
                 panic!("no initializer for SIVec")
-            }),
+            })),
         }
     }
 
@@ -132,7 +132,7 @@ impl<T> SIVec<T> {
         SIVec {
             value_stack: RefCell::new(Vec::new()),
             vec: Vec::with_capacity(cap),
-            initializer: Box::new(move |_| value.clone()),
+            initializer: RefCell::new(Box::new(move |_| value.clone())),
         }
     }
 
@@ -154,7 +154,7 @@ impl<T> SIVec<T> {
         SIVec {
             value_stack: RefCell::new(Vec::new()),
             vec: Vec::with_capacity(cap),
-            initializer: Box::new(init_fn),
+            initializer: RefCell::new(Box::new(init_fn)),
         }
     }
 
@@ -199,7 +199,7 @@ impl<T> SIVec<T> {
             return vp;
         }
         let value = match value {
-            None => (*self.initializer)(index),
+            None => (*self.initializer.borrow_mut())(index),
             Some(value) => value,
         };
         let value = Value { value, index };
