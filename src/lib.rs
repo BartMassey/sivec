@@ -72,6 +72,19 @@
 //! normal array write. But *we don't have to initialize the
 //! giant array first,* which is great if the array is going
 //! to be really sparsely filled.
+//!
+//! ## References
+//!
+//! This [blog
+//! post](https://www.ralfj.de/blog/2019/07/14/uninit.html),
+//! (that I found the link to in this [other blog
+//! post](https://research.swtch.com/sparse) that I was
+//! referred to by a [Reddit
+//! user](https://www.reddit.com/user/Zde-G/)), describes
+//! this data structure in terms of a sparse set. Apparently
+//! the idea is very old. This
+//! [paper](https://citeseer.ist.psu.edu/viewdoc/summary?doi=10.1.1.30.7319)
+//! is referenced as a description.
 
 use std::cell::RefCell;
 use std::isize;
