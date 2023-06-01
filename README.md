@@ -25,8 +25,17 @@ is referenced, a check is done to see if the stack index is
 valid. If so, the value on the stack is used; otherwise a
 new pair is pushed onto the stack and the indices array is
 set to point at it. Thus, memory is lazily initialized as it
-used, on-the-fly. (For a more detailed description, please
-see the Rustdoc.)
+used, on-the-fly.
+
+For example, in this situation
+
+![lazy array initialization](lazyarray.png)
+
+element 3 of the array points to stack slot 0, and stack
+slot 0 holds the value "x" and points to element 3. The
+uninitialized elements may point anywhere: if they hit stack
+slot 0, it will not matter, since the slot "knows" it is for
+element 3.
 
 I was told about this data structure in grad school at some
 point, but don't have a reference handy. If someone else
