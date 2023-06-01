@@ -38,11 +38,10 @@ slot 0, it will not matter, since the slot "knows" it is for
 element 3.
 
 I was told about this data structure in grad school at some
-point, but don't have a reference handy. If someone else
-does it would be appreciated.
+point. See the rustdoc for references.
 
 This code was written as much as an exercise in interior
-mutability as because it would be useful for
+mutability and unsafe code as because it would be useful for
 anything. It has not been extensively tested, and not
 benchmarked at all.
 
