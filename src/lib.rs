@@ -82,9 +82,13 @@
 //! referred to by a [Reddit
 //! user](https://www.reddit.com/user/Zde-G/)), describes
 //! this data structure in terms of a sparse set. Apparently
-//! the idea is very old. This
+//! the idea is very old: at least mid-1970s when it was
+//! referred to by Aho/Hopcroft/Ullman (Aho A, Hopcroft J,
+//! Ullman J. *The Design and Analysis of Computer
+//! Algorithms.* Addison-Wesley: Reading, MA, 1974). This
 //! [paper](https://citeseer.ist.psu.edu/viewdoc/summary?doi=10.1.1.30.7319)
-//! is referenced as a description.
+//! is referenced as a description, although the link now
+//! seems dead.
 
 use std::cell::RefCell;
 use std::isize;
